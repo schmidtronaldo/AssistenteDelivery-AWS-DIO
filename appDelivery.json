@@ -1,0 +1,71 @@
+{
+  "Comment": "Assistente de Delivery usando Step Functions e Bedrock",
+  "StartAt": "IniciarPedido",
+  "States": {
+    "IniciarPedido": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "bedrock-delivery-model",
+        "Prompt": "O cliente fez um pedido de delivery. Identifique o produto e a localização.",
+        "InputText": "$.inputText",
+        "MaxTokens": 100
+      },
+      "Next": "ProcessarPedido"
+    },
+    "ProcessarPedido": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.result.intent",
+          "StringEquals": "ConfirmacaoDeEndereco",
+          "Next": "ConfirmarEndereco"
+        },
+        {
+          "Variable": "$.result.intent",
+          "StringEquals": "ConfirmacaoDeProduto",
+          "Next": "ConfirmarProduto"
+        }
+      ],
+      "Default": "ErroNaoReconhecido"
+    },
+    "ConfirmarEndereco": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "bedrock-delivery-model",
+        "Prompt": "O cliente confirmou o endereço. Realize a verificação de entrega.",
+        "InputText": "$.result.confirmAddress",
+        "MaxTokens": 50
+      },
+      "Next": "FinalizarPedido"
+    },
+    "ConfirmarProduto": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "bedrock-delivery-model",
+        "Prompt": "O cliente confirmou o produto. Realize a verificação do item.",
+        "InputText": "$.result.confirmProduct",
+        "MaxTokens": 50
+      },
+      "Next": "FinalizarPedido"
+    },
+    "ErroNaoReconhecido": {
+      "Type": "Fail",
+      "Error": "ErroDeProcessamento",
+      "Cause": "Não foi possível identificar a intenção do cliente."
+    },
+    "FinalizarPedido": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "bedrock-delivery-model",
+        "Prompt": "Pedido finalizado com sucesso. Enviar confirmação de entrega ao cliente.",
+        "InputText": "$.result.finalizeOrder",
+        "MaxTokens": 50
+      },
+      "End": true
+    }
+  }
+}
